@@ -2,17 +2,18 @@
   (:import
    (io.github.resilience4j.circuitbreaker CircuitBreakerConfig
                                           CircuitBreaker)
+   (io.github.resilience4j.core EventConsumer)
+   (io.vavr.control Try)
    (java.util.function Supplier)
-   (io.vavr.control Try)))
+   (java.time Duration)))
 
 (defn ^:private get-failure-handler [{:keys [fallback]}]
   (if fallback
     (fn [e] (fallback e))
     (fn [e] (throw e))))
 
-                                        ; FIXME: needs to deal with CircuitBreakerEventListener, Predicate and
-                                        ; undocumented isAutomaticTransitionFromOpenToHalfOpenEnabled
-(defn ^:private get-circuit-breaker-config
+;; FIXME: needs to deal with RecordFailurePredicate
+(defn ^:private config-data->circuit-breaker-config
   "the failure rate threshold in percentage above which the
   CircuitBreaker should trip open and start short-circuiting calls
 
@@ -31,8 +32,8 @@
   [{:keys [failure-rate-threshold
            ring-buffer-size-in-closed-state
            ring-buffer-size-in-half-open-state
-           wait-duration-in-open-state]}]
-  (println "AQUI")
+           wait-duration-in-open-state
+           automatic-transition-from-open-to-half-open-enabled?]}]
   (.build
    (doto (CircuitBreakerConfig/custom)
      (#(if failure-rate-threshold
@@ -41,11 +42,25 @@
          (.ringBufferSizeInClosedState % ring-buffer-size-in-closed-state) %))
      (#(if ring-buffer-size-in-half-open-state
          (.ringBufferSizeInHalfOpenState % ring-buffer-size-in-half-open-state) %))
-     #_(#(if wait-duration-in-open-state
-           (.waitDurationInOpenState % wait-duration-in-open-state) %))
-     .build)))
+     (#(if wait-duration-in-open-state
+         (.waitDurationInOpenState % (Duration/ofMillis wait-duration-in-open-state)) %))
+     (#(if automatic-transition-from-open-to-half-open-enabled?
+         (.enableAutomaticTransitionFromOpenToHalfOpen %) %)))))
 
-;; FIXME: probably create a "datafy" kind of interface to and from CircuitBreakerConfig
+;; FIXME: needs to deal with RecordFailurePredicate
+(defn ^:private circuit-breaker-config->config-data
+  [cb-config]
+  {:failure-rate-threshold (.getFailureRateThreshold cb-config)
+   :ring-buffer-size-in-closed-state (.getRingBufferSizeInClosedState cb-config)
+   :ring-buffer-size-in-half-open-state (.getRingBufferSizeInHalfOpenState cb-config)
+   :wait-duration-in-open-state (.toMillis (.getWaitDurationInOpenState cb-config))
+   #_:record-failure-predicate #_(.getRecordFailurePredicate cb-config)
+   :automatic-transition-from-open-to-half-open-enabled? (.isAutomaticTransitionFromOpenToHalfOpenEnabled cb-config)})
+
+(defn ^:private event-consumer [f]
+  (reify EventConsumer
+    (consumeEvent [this e]
+      (f e))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -57,12 +72,13 @@
    (create n nil))
   ([n opts]
    (if opts
-     (CircuitBreaker/of ^String n ^CircuitBreakerConfig (get-circuit-breaker-config opts))
+     (CircuitBreaker/of ^String n
+                        ^CircuitBreakerConfig (config-data->circuit-breaker-config opts))
      (CircuitBreaker/ofDefaults n))))
 
 (defn decorate
   ([f cb]
-   (decorate f cb nil)) 
+   (decorate f cb nil))
   ([f cb opts]
    (fn [& args]
      (let [supplier (reify Supplier
@@ -90,18 +106,23 @@
 
 (defn info
   [cb]
-  (let [config (.getCircuitBreakerConfig cb)]
-    {:failure-rate-threshold (.getFailureRateThreshold config)
-     :ring-buffer-size-in-closed-state (.getRingBufferSizeInClosedState config)
-     :ring-buffer-size-in-half-open-state (.getRingBufferSizeInHalfOpenState config)
-     :wait-duration-in-open-state (.getWaitDurationInOpenState config)
-     :record-failure-predicate (.getRecordFailurePredicate config)
-     :automatic-transition-from-open-to-half-open-enabled? (.isAutomaticTransitionFromOpenToHalfOpenEnabled config)}))
+  (-> cb
+      .getCircuitBreakerConfig
+      circuit-breaker-config->config-data))
 
-
-
-
-
+(defn listen-event
+  ([cb f]
+   (listen-event cb :all f))
+  ([cb event-key f]
+   (let [event-publisher (.getEventPublisher cb)
+         consumer (event-consumer f)]
+     (case event-key
+       :success (.onSuccess event-publisher consumer)
+       :error (.onError event-publisher consumer)
+       :ignored-error (.onIgnoredError event-publisher consumer)
+       :reset (.onReset event-publisher consumer)
+       :state-transition (.onStateTransition event-publisher consumer)
+       :all (.onEvent event-publisher consumer)))))
 
 (comment
   ;; set up a breaker for the service (possibly from states/mount)
@@ -151,8 +172,22 @@
                                 {:failure-rate-threshold 20.0
                                  :ring-buffer-size-in-closed-state 2
                                  :ring-buffer-size-in-half-open-state 2
-                                 :wait-duration-in-open-state 1000}))
+                                 :wait-duration-in-open-state 60000}))
 
 
   (info service-breaker2)
+
+  (defn iffy-dependency [fail]
+    (if fail
+      (throw (ex-info "No good!" {}))
+      "Very good!"))
+
+  (def protected-iffy (decorate iffy-dependency service-breaker2))
+
+  (reset service-breaker2)
+  
+  (protected-iffy false)
+
+  (metrics service-breaker2)
+  
   )
