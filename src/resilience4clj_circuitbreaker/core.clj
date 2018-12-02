@@ -7,6 +7,17 @@
    (java.util.function Supplier)
    (java.time Duration)))
 
+(defn ^:private anom-map
+  [category msg]
+  {:resilience4clj.anomaly/category (keyword "resilience4clj.anomaly" (name category))
+   :resilience4clj.anomaly/message msg})
+
+(defn ^:private anomaly!
+  ([name msg]
+   (throw (ex-info msg (anom-map name msg))))
+  ([name msg cause]
+   (throw (ex-info msg (anom-map name msg) cause))))
+
 (defn ^:private get-failure-handler [{:keys [fallback]}]
   (if fallback
     (fn [e] (fallback e))
@@ -76,16 +87,21 @@
                         ^CircuitBreakerConfig (config-data->circuit-breaker-config opts))
      (CircuitBreaker/ofDefaults n))))
 
+(defn config
+  [breaker]
+  (-> breaker
+      .getCircuitBreakerConfig
+      circuit-breaker-config->config-data))
+
 (defn decorate
-  ([f cb]
-   (decorate f cb nil))
-  ([f cb opts]
+  ([f breaker]
+   (decorate f breaker nil))
+  ([f breaker opts]
    (fn [& args]
-     (let [supplier (reify Supplier
-                      (get [this] (apply f args)))
-           decorated-supplier (CircuitBreaker/decorateSupplier cb supplier)
+     (let [callable (reify Callable (call [_] (apply f args)))
+           decorated-callable (CircuitBreaker/decorateCallable breaker callable)
            failure-handler (get-failure-handler opts)
-           result (Try/ofSupplier decorated-supplier)]
+           result (Try/ofCallable decorated-callable)]
        (if (.isSuccess result)
          (.get result)
          (failure-handler (.getCause result)))))))
@@ -96,19 +112,23 @@
   the current number of failed calls."
   [cb]
   (let [metrics (.getMetrics cb)]
-    {:failure-rate             (.getFailureRate metrics)
-     :number-of-buffered-calls (.getNumberOfBufferedCalls metrics)
-     :number-of-failed-calls   (.getNumberOfFailedCalls metrics)}))
+    {:failure-rate                  (.getFailureRate metrics)
+     :number-of-buffered-calls      (.getNumberOfBufferedCalls metrics)
+     :number-of-failed-calls        (.getNumberOfFailedCalls metrics)
+     :number-of-not-permitted-calls (.getNumberOfNotPermittedCalls metrics)
+     :max-number-of-buffered-calls  (.getMaxNumberOfBufferedCalls metrics)
+     :number-of-successful-calls    (.getNumberOfSuccessfulCalls metrics)}))
+
+(defn state
+  [breaker]
+  (-> breaker
+      .getState
+      .toString
+      keyword))
 
 (defn reset
   [cb]
   (.reset cb))
-
-(defn info
-  [cb]
-  (-> cb
-      .getCircuitBreakerConfig
-      circuit-breaker-config->config-data))
 
 (defn listen-event
   ([cb f]
@@ -123,6 +143,11 @@
        :reset (.onReset event-publisher consumer)
        :state-transition (.onStateTransition event-publisher consumer)
        :all (.onEvent event-publisher consumer)))))
+
+
+
+
+
 
 (comment
   ;; set up a breaker for the service (possibly from states/mount)
