@@ -1,4 +1,4 @@
-(ns resilience4clj-circuibreaker.core
+(ns resilience4clj-circuitbreaker.core
   (:import
    (io.github.resilience4j.circuitbreaker CircuitBreakerConfig
                                           CircuitBreaker)
@@ -46,17 +46,21 @@
            wait-duration-in-open-state
            automatic-transition-from-open-to-half-open-enabled?]}]
   (.build
-   (doto (CircuitBreakerConfig/custom)
-     (#(if failure-rate-threshold
-         (.failureRateThreshold % failure-rate-threshold) %))
-     (#(if ring-buffer-size-in-closed-state
-         (.ringBufferSizeInClosedState % ring-buffer-size-in-closed-state) %))
-     (#(if ring-buffer-size-in-half-open-state
-         (.ringBufferSizeInHalfOpenState % ring-buffer-size-in-half-open-state) %))
-     (#(if wait-duration-in-open-state
-         (.waitDurationInOpenState % (Duration/ofMillis wait-duration-in-open-state)) %))
-     (#(if automatic-transition-from-open-to-half-open-enabled?
-         (.enableAutomaticTransitionFromOpenToHalfOpen %) %)))))
+   (cond-> (CircuitBreakerConfig/custom)
+     failure-rate-threshold
+     (.failureRateThreshold failure-rate-threshold)
+
+     ring-buffer-size-in-closed-state
+     (.ringBufferSizeInClosedState ring-buffer-size-in-closed-state)
+
+     ring-buffer-size-in-half-open-state
+     (.ringBufferSizeInHalfOpenState ring-buffer-size-in-half-open-state)
+
+     wait-duration-in-open-state
+     (.waitDurationInOpenState (Duration/ofMillis wait-duration-in-open-state))
+
+     (not (nil? automatic-transition-from-open-to-half-open-enabled?))
+     (.enableAutomaticTransitionFromOpenToHalfOpen))))
 
 ;; FIXME: needs to deal with RecordFailurePredicate
 (defn ^:private circuit-breaker-config->config-data
@@ -153,9 +157,18 @@
   ;; set up a breaker for the service (possibly from states/mount)
   (def service-breaker (create "MyService"))
 
+  (config service-breaker)
+  
   ;; mock for an external call
-  (defn external-call []
-    "Does external call here")
+  (defn external-call
+    ([n]
+     (external-call n nil))
+    ([n {:keys [fail? wait]}]
+     (when wait
+       (Thread/sleep wait))
+     (if-not fail?
+       (str "Hello " n "!")
+       (anomaly! :broken-hello "Couldn't say hello"))))
 
   ;; circuit breaker protecetd function
   (def protected-call (decorate external-call
@@ -165,25 +178,27 @@
   (protected-call) ;; => "Does external call here"
 
   (dotimes [n 10]
-    (protected-call))
+    (protected-call "World!!"))
 
-
+  (metrics service-breaker)
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-  (defn external-call-failure []
-    (throw (ex-info "Nope!" {})))
-
   ;; protected with fallback (will return fallback if failure/timeout/open cb/etc)
-  (def protected-call-safe (decorate external-call-failure
-                                     service-breaker
-                                     {:fallback (fn [e] (str "Default for service! " (.getMessage e)))}))
+  (def protected-call-fallback (decorate external-call
+                                         service-breaker
+                                         {:fallback
+                                          (fn [e]
+                                            (str "I should say Hello but got " (.getMessage e)))}))
 
   ;; call the protected version
-  (protected-call-safe) ;; => "Default for service" (if failure)
+  (protected-call-fallback) ;; => "Default for service" (if failure)
 
   (dotimes [n 100]
-    (protected-call-safe))
+    (protected-call-fallback))
 
+  (metrics service-breaker)
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   (metrics service-breaker)
