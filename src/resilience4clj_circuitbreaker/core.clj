@@ -20,8 +20,8 @@
 
 (defn ^:private get-failure-handler [{:keys [fallback]}]
   (if fallback
-    (fn [e] (fallback e))
-    (fn [e] (throw e))))
+    (fn [& args] (apply fallback args))
+    (fn [& args] (throw (-> args last :cause)))))
 
 ;; FIXME: needs to deal with RecordFailurePredicate
 (defn ^:private config-data->circuit-breaker-config
@@ -72,10 +72,52 @@
    #_:record-failure-predicate #_(.getRecordFailurePredicate cb-config)
    :automatic-transition-from-open-to-half-open-enabled? (.isAutomaticTransitionFromOpenToHalfOpenEnabled cb-config)})
 
+(defmulti ^:private event->data
+  (fn [e]
+    (-> e .getEventType .toString keyword)))
+
+(defn ^:private base-event->data [e]
+  {:event-type (-> e .getEventType .toString keyword)
+   :circuit-breaker-name (.getCircuitBreakerName e)
+   :creation-time (.getCreationTime e)})
+
+(defn ^:private ellapsed-event->data [e]
+  (merge (base-event->data e)
+         {:ellapsed-duration (-> e .getElapsedDuration .toNanos)}))
+
+;; informs that a success has been recorded
+(defmethod event->data :SUCCESS [e]
+  (ellapsed-event->data e))
+
+;; informs that an error has been recorded
+(defmethod event->data :ERROR [e]
+  (merge (ellapsed-event->data e)
+         {:throwable (.getThrowable e)}))
+
+;; informs about a reset
+(defmethod event->data :RESET [e]
+  (base-event->data e))
+
+;; informs that a call was not permitted, because the CircuitBreaker is OPEN
+(defmethod event->data :NOT_PERMITTED [e]
+  (base-event->data e))
+
+;; informs that an error has been ignored
+(defmethod event->data :IGNORED_ERROR [e]
+  (merge (ellapsed-event->data e)
+         {:throwable (.getThrowable e)}))
+
+;; informs about a state transition.
+(defmethod event->data :STATE_TRANSITION [e]
+  (merge (base-event->data e)
+         {:from-state (-> e .getStateTransition .getFromState .toString keyword)
+          :to-state   (-> e .getStateTransition .getToState   .toString keyword)}))
+
 (defn ^:private event-consumer [f]
   (reify EventConsumer
     (consumeEvent [this e]
-      (f e))))
+      (let [data (event->data e)]
+        (f data)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -108,7 +150,8 @@
            result (Try/ofCallable decorated-callable)]
        (if (.isSuccess result)
          (.get result)
-         (failure-handler (.getCause result)))))))
+         (let [args' (-> args vec (conj {:cause (.getCause result)}))]
+           (apply failure-handler args')))))))
 
 (defn metrics
   "the failure rate in percentage.
@@ -188,8 +231,8 @@
   (def protected-call-fallback (decorate external-call
                                          service-breaker
                                          {:fallback
-                                          (fn [e]
-                                            (str "I should say Hello but got " (.getMessage e)))}))
+                                          (fn [args]
+                                            (str "I should say Hello but got " (-> args last :cause .getMessage)))}))
 
   ;; call the protected version
   (protected-call-fallback) ;; => "Default for service" (if failure)
@@ -229,5 +272,15 @@
   (protected-iffy false)
 
   (metrics service-breaker2)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  (def breaker (create "MyService"))
+
+  (def decorated-call (decorate external-call breaker))
+
+  (listen-event breaker (fn [e] (println "dentro")))
   
-  )
+  (decorated-call "hey")
+  (decorated-call "hey" {:fail? true})
+  (reset breaker))

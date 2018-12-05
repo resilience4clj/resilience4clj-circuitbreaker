@@ -8,7 +8,8 @@
  {:dev
   {:extra-paths ["dev"]
    :extra-deps
-   {}}
+   {org.clojure/tools.namespace      {:mvn/version "0.2.11"}
+    org.clojure/tools.nrepl          {:mvn/version "0.2.13"}}}
 
   :test
   {:extra-paths ["test"]

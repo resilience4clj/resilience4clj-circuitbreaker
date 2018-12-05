@@ -101,7 +101,9 @@
 
   (testing "breakeage and return from breakeage"
     (let [cb (breaker/create "MyService" {:wait-duration-in-open-state 1000})
-          decorated (breaker/decorate external-call cb)]
+          decorated (breaker/decorate external-call cb)
+          events (atom [])]
+      (breaker/listen-event cb (fn [e] (swap! events conj e)))
       (dotimes [n 100]
         (decorated "World"))
       (dotimes [n 20]
@@ -192,11 +194,45 @@
               :number-of-buffered-calls 1
               :number-of-failed-calls 0
               :number-of-not-permitted-calls 0
-              :number-of-successful-calls 1
-              }
-             (breaker/metrics cb))))))
+              :number-of-successful-calls 1}
+             (breaker/metrics cb)))
+      (is (= 203 (count @events)))
+      (are [start amount event-type]
+          (= amount
+             (->> @events
+                  (take (+ start amount))
+                  (take-last amount)
+                  (filter #(= event-type (:event-type %)))
+                  count))
+        0 100  :SUCCESS
+        100 40 :ERROR
+        140 10 :ERROR
+        150 1  :STATE_TRANSITION
+        151 10 :NOT_PERMITTED
+        161 20 :NOT_PERMITTED
+        181 20 :NOT_PERMITTED
+        201 1  :STATE_TRANSITION
+        202 1  :SUCCESS))))
 
+(deftest fallback-function
+  (testing "non fallback option"
+    (let [cb (breaker/create "MyService")
+          decorated (breaker/decorate external-call cb)]
+      (is (thrown? Throwable (decorated "World!" {:fail? true})))
+      (try
+        (decorated "World!" {:fail? true})
+        (catch Throwable e
+          (is (= :here)
+              (-> e ex-data :extra-info))))))
 
-#_(deftest fallback-function)
+  (testing "with fallback option"
+    (let [fallback-fn (fn [n opts {:keys [cause]}]
+                        (str "It should say Hello " n " but it didn't "
+                             "because of a problem " (-> cause ex-data :extra-info name)))
+          cb (breaker/create "MyService")
+          decorated (breaker/decorate external-call cb
+                                      {:fallback fallback-fn})]
+      (is (= "It should say Hello World! but it didn't because of a problem here"
+             (decorated "World!" {:fail? true}))))))
 
 #_(deftest breaker-events)
