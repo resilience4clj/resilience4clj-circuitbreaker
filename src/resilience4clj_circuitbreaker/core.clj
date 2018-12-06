@@ -157,8 +157,8 @@
   "the failure rate in percentage.
   the current number of buffered calls.
   the current number of failed calls."
-  [cb]
-  (let [metrics (.getMetrics cb)]
+  [breaker]
+  (let [metrics (.getMetrics breaker)]
     {:failure-rate                  (.getFailureRate metrics)
      :number-of-buffered-calls      (.getNumberOfBufferedCalls metrics)
      :number-of-failed-calls        (.getNumberOfFailedCalls metrics)
