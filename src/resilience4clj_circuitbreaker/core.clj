@@ -179,17 +179,17 @@
 
 (defn listen-event
   ([cb f]
-   (listen-event cb :all f))
+   (listen-event cb :ALL f))
   ([cb event-key f]
    (let [event-publisher (.getEventPublisher cb)
          consumer (event-consumer f)]
      (case event-key
-       :success (.onSuccess event-publisher consumer)
-       :error (.onError event-publisher consumer)
-       :ignored-error (.onIgnoredError event-publisher consumer)
-       :reset (.onReset event-publisher consumer)
-       :state-transition (.onStateTransition event-publisher consumer)
-       :all (.onEvent event-publisher consumer)))))
+       :SUCCESS (.onSuccess event-publisher consumer)
+       :ERROR (.onError event-publisher consumer)
+       :IGNORED_ERROR (.onIgnoredError event-publisher consumer)
+       :RESET (.onReset event-publisher consumer)
+       :STATE_TRANSITION (.onStateTransition event-publisher consumer)
+       :ALL (.onEvent event-publisher consumer)))))
 
 
 
