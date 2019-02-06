@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>resilience4clj</groupId>
   <artifactId>resilience4clj-circuitbreaker</artifactId>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
   <name>resilience4clj-circuitbreaker</name>
 
   <dependencies>
