@@ -1,7 +1,7 @@
 {:paths ["src"]
  
  :deps
- {org.clojure/clojure                                {:mvn/version "1.9.0"}
+ {org.clojure/clojure                                {:mvn/version "1.10.0"}
   io.github.resilience4j/resilience4j-circuitbreaker {:mvn/version "0.13.2"}}
 
  :aliases
