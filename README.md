@@ -72,14 +72,14 @@ Add `resilience4clj/resilience4clj-circuitbreaker` as a dependency to
 your `deps.edn` file:
 
 ``` clojure
-resilience4clj/resilience4clj-circuitbreaker {:mvn/version "0.1.1"}
+resilience4clj/resilience4clj-circuitbreaker {:mvn/version "0.1.2"}
 ```
 
 If you are using `lein` instead, add it as a dependency to your
 `project.clj` file:
 
 ``` clojure
-[resilience4clj/resilience4clj-circuitbreaker "0.1.1"]
+[resilience4clj/resilience4clj-circuitbreaker "0.1.2"]
 ```
 
 Require the library:
