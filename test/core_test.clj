@@ -222,8 +222,8 @@
       (try
         (decorated "World!" {:fail? true})
         (catch Throwable e
-          (is (= :here)
-              (-> e ex-data :extra-info))))))
+          (is (= :here
+                 (-> e ex-data :extra-info)))))))
 
   (testing "with fallback option"
     (let [fallback-fn (fn [n opts {:keys [cause]}]
