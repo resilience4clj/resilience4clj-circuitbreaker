@@ -1,6 +1,6 @@
 [about]: ./docs/ABOUT.md
 [time-limiter]: https://github.com/luchiniatwork/resilience4clj-timelimiter/
-[circleci-badge]: https://circleci.com/gh/luchiniatwork/resilience4clj-circuitbreaker.svgg?style=shield&circle-token=3f807e42b18707a5a9b2a8b0e59561af1a4a1b67
+[circleci-badge]: https://circleci.com/gh/luchiniatwork/resilience4clj-circuitbreaker.svg?style=svg&circle-token=3f807e42b18707a5a9b2a8b0e59561af1a4a1b67
 [circleci]: https://circleci.com/gh/luchiniatwork/resilience4clj-circuitbreaker
 [clojars-badge]: https://img.shields.io/clojars/v/resilience4clj/resilience4clj-circuitbreaker.svg
 [clojars]: http://clojars.org/resilience4clj/resilience4clj-circuitbreaker
