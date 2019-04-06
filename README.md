@@ -267,15 +267,15 @@ failed. Example:
 
 (def protected-hello
   (cb/decorate hello
-               {:fallback (fn [person e]
+               {:fallback (fn [e person]
                             (str "Hello from fallback to " person))}))
 ```
 
 The signature of the fallback function is the same as the original
-function plus an exception (`e` on the example above). This exception
-is an `ExceptionInfo` wrapping around the real cause of the error. You
-can inspect the `:cause` node of this exception to learn about the
-inner exception:
+function plus an exception as the first argument (`e` on the example
+above). This exception is an `ExceptionInfo` wrapping around the real
+cause of the error. You can inspect the `:cause` node of this
+exception to learn about the inner exception:
 
 ``` clojure
 (defn fallback-fn [e]

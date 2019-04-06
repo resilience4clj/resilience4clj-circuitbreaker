@@ -21,7 +21,7 @@
 (defn ^:private get-failure-handler [{:keys [fallback]}]
   (if fallback
     (fn [& args] (apply fallback args))
-    (fn [& args] (throw (-> args last :cause)))))
+    (fn [& args] (throw (-> args first :cause)))))
 
 ;; FIXME: needs to deal with RecordFailurePredicate
 (defn ^:private config-data->circuit-breaker-config
@@ -150,7 +150,7 @@
            result (Try/ofCallable decorated-callable)]
        (if (.isSuccess result)
          (.get result)
-         (let [args' (-> args vec (conj {:cause (.getCause result)}))]
+         (let [args' (-> args (conj {:cause (.getCause result)}))]
            (apply failure-handler args')))))))
 
 (defn metrics

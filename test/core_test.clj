@@ -226,7 +226,7 @@
                  (-> e ex-data :extra-info)))))))
 
   (testing "with fallback option"
-    (let [fallback-fn (fn [n opts {:keys [cause]}]
+    (let [fallback-fn (fn [{:keys [cause]} n opts]
                         (str "It should say Hello " n " but it didn't "
                              "because of a problem " (-> cause ex-data :extra-info name)))
           cb (breaker/create "MyService")
