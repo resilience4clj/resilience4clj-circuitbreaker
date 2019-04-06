@@ -1,4 +1,5 @@
 (ns resilience4clj-circuitbreaker.core
+  (:refer-clojure :exclude [reset!])
   (:import
    (io.github.resilience4j.circuitbreaker CircuitBreakerConfig
                                           CircuitBreaker)
@@ -172,7 +173,7 @@
       .toString
       keyword))
 
-(defn reset
+(defn reset!
   [cb]
   (.reset cb))
 

@@ -380,10 +380,10 @@ about them read [implementation details](#implementation-details)
 below.
 
 The state, ring buffer, and metrics can be reset with a call to the
-`reset` function:
+`reset!` function:
 
 ``` clojure
-(cb/reset breaker)
+(cb/reset! breaker)
 ```
 
 ## Events

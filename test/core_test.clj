@@ -90,7 +90,7 @@
               :number-of-not-permitted-calls 0
               :number-of-successful-calls 50}
              (breaker/metrics cb)))
-      (breaker/reset cb)
+      (breaker/reset! cb)
       (is (= {:failure-rate -1.0
               :max-number-of-buffered-calls 100
               :number-of-buffered-calls 0
