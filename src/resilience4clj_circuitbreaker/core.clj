@@ -2,10 +2,23 @@
   (:refer-clojure :exclude [reset!])
   (:import
    (io.github.resilience4j.circuitbreaker CircuitBreakerConfig
-                                          CircuitBreaker)
+                                          CircuitBreaker
+                                          CircuitBreaker$EventPublisher)
+
+   (io.github.resilience4j.circuitbreaker.event CircuitBreakerEvent
+                                                CircuitBreakerOnCallNotPermittedEvent
+                                                CircuitBreakerOnErrorEvent
+                                                CircuitBreakerOnIgnoredErrorEvent
+                                                CircuitBreakerOnResetEvent
+                                                CircuitBreakerOnStateTransitionEvent
+                                                CircuitBreakerOnSuccessEvent)
+   
    (io.github.resilience4j.core EventConsumer)
+
    (io.vavr.control Try)
+
    (java.util.function Supplier)
+
    (java.time Duration)))
 
 (defn ^:private anom-map
@@ -65,7 +78,7 @@
 
 ;; FIXME: needs to deal with RecordFailurePredicate
 (defn ^:private circuit-breaker-config->config-data
-  [cb-config]
+  [^CircuitBreakerConfig cb-config]
   {:failure-rate-threshold (.getFailureRateThreshold cb-config)
    :ring-buffer-size-in-closed-state (.getRingBufferSizeInClosedState cb-config)
    :ring-buffer-size-in-half-open-state (.getRingBufferSizeInHalfOpenState cb-config)
@@ -74,42 +87,41 @@
    :automatic-transition-from-open-to-half-open-enabled? (.isAutomaticTransitionFromOpenToHalfOpenEnabled cb-config)})
 
 (defmulti ^:private event->data
-  (fn [e]
+  (fn [^CircuitBreakerEvent e]
     (-> e .getEventType .toString keyword)))
 
-(defn ^:private base-event->data [e]
+(defn ^:private base-event->data [^CircuitBreakerEvent e]
   {:event-type (-> e .getEventType .toString keyword)
    :circuit-breaker-name (.getCircuitBreakerName e)
    :creation-time (.getCreationTime e)})
 
-(defn ^:private ellapsed-event->data [e]
+;; informs that a success has been recorded
+(defmethod event->data :SUCCESS [^CircuitBreakerOnSuccessEvent e]
   (merge (base-event->data e)
          {:ellapsed-duration (-> e .getElapsedDuration .toNanos)}))
 
-;; informs that a success has been recorded
-(defmethod event->data :SUCCESS [e]
-  (ellapsed-event->data e))
-
 ;; informs that an error has been recorded
-(defmethod event->data :ERROR [e]
-  (merge (ellapsed-event->data e)
-         {:throwable (.getThrowable e)}))
+(defmethod event->data :ERROR [^CircuitBreakerOnErrorEvent e]
+  (merge (base-event->data e)
+         {:ellapsed-duration (-> e .getElapsedDuration .toNanos)
+          :throwable (.getThrowable e)}))
 
 ;; informs about a reset
-(defmethod event->data :RESET [e]
+(defmethod event->data :RESET [^CircuitBreakerOnResetEvent e]
   (base-event->data e))
 
 ;; informs that a call was not permitted, because the CircuitBreaker is OPEN
-(defmethod event->data :NOT_PERMITTED [e]
+(defmethod event->data :NOT_PERMITTED [^CircuitBreakerOnCallNotPermittedEvent e]
   (base-event->data e))
 
 ;; informs that an error has been ignored
-(defmethod event->data :IGNORED_ERROR [e]
-  (merge (ellapsed-event->data e)
-         {:throwable (.getThrowable e)}))
+(defmethod event->data :IGNORED_ERROR [^CircuitBreakerOnIgnoredErrorEvent e]
+  (merge (base-event->data e)
+         {:ellapsed-duration (-> e .getElapsedDuration .toNanos)
+          :throwable (.getThrowable e)}))
 
 ;; informs about a state transition.
-(defmethod event->data :STATE_TRANSITION [e]
+(defmethod event->data :STATE_TRANSITION [^CircuitBreakerOnStateTransitionEvent e]
   (merge (base-event->data e)
          {:from-state (-> e .getStateTransition .getFromState .toString keyword)
           :to-state   (-> e .getStateTransition .getToState   .toString keyword)}))
@@ -135,15 +147,15 @@
      (CircuitBreaker/ofDefaults n))))
 
 (defn config
-  [breaker]
+  [^CircuitBreaker breaker]
   (-> breaker
       .getCircuitBreakerConfig
       circuit-breaker-config->config-data))
 
 (defn decorate
-  ([f breaker]
+  ([f ^CircuitBreaker breaker]
    (decorate f breaker nil))
-  ([f breaker {:keys [effect] :as opts}]
+  ([f ^CircuitBreaker breaker {:keys [effect] :as opts}]
    (fn [& args]
      (let [callable (reify Callable (call [_] (apply f args)))
            decorated-callable (CircuitBreaker/decorateCallable breaker callable)
@@ -157,7 +169,7 @@
            (apply failure-handler args')))))))
 
 (defn metrics
-  [breaker]
+  [^CircuitBreaker breaker]
   (let [metrics (.getMetrics breaker)]
     {:failure-rate                  (.getFailureRate metrics)
      :number-of-buffered-calls      (.getNumberOfBufferedCalls metrics)
@@ -167,22 +179,22 @@
      :number-of-successful-calls    (.getNumberOfSuccessfulCalls metrics)}))
 
 (defn state
-  [breaker]
+  [^CircuitBreaker breaker]
   (-> breaker
       .getState
       .toString
       keyword))
 
 (defn reset!
-  [cb]
+  [^CircuitBreaker cb]
   (.reset cb))
 
 (defn listen-event
-  ([cb f]
+  ([^CircuitBreaker cb f]
    (listen-event cb :ALL f))
-  ([cb event-key f]
-   (let [event-publisher (.getEventPublisher cb)
-         consumer (event-consumer f)]
+  ([^CircuitBreaker cb event-key f]
+   (let [^CircuitBreaker$EventPublisher event-publisher (.getEventPublisher cb)
+         ^EventConsumer consumer (event-consumer f)]
      (case event-key
        :SUCCESS (.onSuccess event-publisher consumer)
        :ERROR (.onError event-publisher consumer)
@@ -190,10 +202,6 @@
        :RESET (.onReset event-publisher consumer)
        :STATE_TRANSITION (.onStateTransition event-publisher consumer)
        :ALL (.onEvent event-publisher consumer)))))
-
-
-
-
 
 
 (comment
