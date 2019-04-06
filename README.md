@@ -32,8 +32,8 @@ until a "grace" period has passed.
 
 ## Benefits Inherited from Resilience4j
 
-Resilience4Clj is implemented on top of GitHub's Resilience4j and
-therefore inherets some of its benefits:
+Resilience4Clj circuit breaker is implemented on top of GitHub's
+Resilience4j and therefore inherets some of its benefits:
 
 * Storage of call results in a Ring Bit Buffer without a statistical
   rolling time window. A successful call is stored as a `0 bit` and a
