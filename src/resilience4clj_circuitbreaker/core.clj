@@ -142,21 +142,20 @@
 (defn decorate
   ([f breaker]
    (decorate f breaker nil))
-  ([f breaker opts]
+  ([f breaker {:keys [effect] :as opts}]
    (fn [& args]
      (let [callable (reify Callable (call [_] (apply f args)))
            decorated-callable (CircuitBreaker/decorateCallable breaker callable)
            failure-handler (get-failure-handler opts)
            result (Try/ofCallable decorated-callable)]
        (if (.isSuccess result)
-         (.get result)
+         (let [out (.get result)]
+           (when effect
+             (future (apply effect (conj args out)))))
          (let [args' (-> args (conj {:cause (.getCause result)}))]
            (apply failure-handler args')))))))
 
 (defn metrics
-  "the failure rate in percentage.
-  the current number of buffered calls.
-  the current number of failed calls."
   [breaker]
   (let [metrics (.getMetrics breaker)]
     {:failure-rate                  (.getFailureRate metrics)

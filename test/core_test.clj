@@ -235,4 +235,16 @@
       (is (= "It should say Hello World! but it didn't because of a problem here"
              (decorated "World!" {:fail? true}))))))
 
-#_(deftest breaker-events)
+(deftest effect-function
+  (let [param-ok? (atom false)
+        ret-ok? (atom false)
+        effect-fn (fn [ret n]
+                    (reset! ret-ok? (boolean (= "Hello World!" ret)))
+                    (reset! param-ok? (boolean (= "World" n))))
+        cb (breaker/create "MyService")
+        decorated (breaker/decorate external-call cb
+                                    {:effect effect-fn})]
+    (decorated "World")
+    (Thread/sleep 100)
+    (is (= @ret-ok? true))
+    (is (= @param-ok? true))))

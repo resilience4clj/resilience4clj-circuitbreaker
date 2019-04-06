@@ -1,5 +1,5 @@
 [about]: ./docs/ABOUT.md
-[time-limiter]: https://github.com/luchiniatwork/resilience4clj-timelimiter/
+[cache-effect]: https://github.com/luchiniatwork/resilience4clj-cache#using-as-an-effect
 [circleci-badge]: https://circleci.com/gh/luchiniatwork/resilience4clj-circuitbreaker.svg?style=shield&circle-token=3f807e42b18707a5a9b2a8b0e59561af1a4a1b67
 [circleci]: https://circleci.com/gh/luchiniatwork/resilience4clj-circuitbreaker
 [clojars-badge]: https://img.shields.io/clojars/v/resilience4clj/resilience4clj-circuitbreaker.svg
@@ -8,7 +8,7 @@
 [license-badge]: https://img.shields.io/badge/license-MIT-blue.svg
 [license]: ./LICENSE
 [status-badge]: https://img.shields.io/badge/project%20status-alpha-brightgreen.svg
-
+[time-limiter]: https://github.com/luchiniatwork/resilience4clj-timelimiter/
 # Resilience4Clj Circuit Breaker
 
 [![CircleCI][circleci-badge]][circleci]
@@ -58,6 +58,7 @@ deeper look at the power behind Resilience4Clj.
 * [Getting Started](#getting-started)
 * [Circuit Breaker Settings](#circuit-breaker-settings)
 * [Fallback Strategies](#fallback-strategies)
+* [Effects](#effects)
 * [Metrics](#metrics)
 * [Events](#events)
 * [Exception Handling](#exception-handling)
@@ -302,6 +303,43 @@ strategies:
    same parameters could be sent back).
 3. **Advanced**: multiple strategies can also be combined in order to
    create even better fallback strategies.
+
+For more details on some of these strategies, read the section
+[Effects](#effects) below.
+
+## Effects
+
+A common issue for some fallback strategies is to rely on a cache or
+other content source (see Content Fallback above). In these cases, it
+is good practice to persist the successful output of the function call
+as a side-effect of the call itself.
+
+Resilience4clj retry supports this behavior in the folling way:
+
+``` clojure
+(def breaker (cb/create "hello-service"))
+
+(defn hello [person]
+  (str "Hello " person))
+
+(def protected-hello
+  (cb/decorate hello
+               {:effect (fn [ret person]
+                          ;; ret will have the successful return from `hello`
+                          ;; you can save it on a memory cache, disk, etc
+                          )}))
+```
+
+The signature of the effect function is the same as the original
+function plus a "return" argument as the first argument (`ret` on the
+example above). This argument is the successful return of the
+encapsulated function.
+
+The effect function is called on a separate thread so it is
+non-blocking.
+
+You can see an example of how to use effects for caching purposes at
+[using Resilience4clj cache as an effect][cache-effect].
 
 ## Metrics
 
