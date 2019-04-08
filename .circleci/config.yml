@@ -3,7 +3,7 @@ version: 2
 jobs:
   check:
     docker:
-      - image: circleci/clojure:tools-deps-1.9.0.394
+      - image: circleci/clojure:tools-deps-1.10.0.442
 
     working_directory: ~/repo
 
