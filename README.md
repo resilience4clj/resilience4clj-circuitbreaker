@@ -1,14 +1,15 @@
 [about]: ./docs/ABOUT.md
-[cache-effect]: https://github.com/luchiniatwork/resilience4clj-cache#using-as-an-effect
-[circleci-badge]: https://circleci.com/gh/luchiniatwork/resilience4clj-circuitbreaker.svg?style=shield&circle-token=3f807e42b18707a5a9b2a8b0e59561af1a4a1b67
-[circleci]: https://circleci.com/gh/luchiniatwork/resilience4clj-circuitbreaker
+[cache-effect]: https://github.com/resilience4clj/resilience4clj-cache#using-as-an-effect
+[circleci-badge]: https://circleci.com/gh/resilience4clj/resilience4clj-circuitbreaker.svg?style=shield&circle-token=3f807e42b18707a5a9b2a8b0e59561af1a4a1b67
+[circleci]: https://circleci.com/gh/resilience4clj/resilience4clj-circuitbreaker
 [clojars-badge]: https://img.shields.io/clojars/v/resilience4clj/resilience4clj-circuitbreaker.svg
 [clojars]: http://clojars.org/resilience4clj/resilience4clj-circuitbreaker
-[github-issues]: https://github.com/luchiniatwork/resilience4clj-circuitbreaker/issues
+[github-issues]: https://github.com/resilience4clj/resilience4clj-circuitbreaker/issues
 [license-badge]: https://img.shields.io/badge/license-MIT-blue.svg
 [license]: ./LICENSE
 [status-badge]: https://img.shields.io/badge/project%20status-alpha-brightgreen.svg
-[time-limiter]: https://github.com/luchiniatwork/resilience4clj-timelimiter/
+[time-limiter]: https://github.com/resilience4clj/resilience4clj-timelimiter/
+
 # Resilience4Clj Circuit Breaker
 
 [![CircleCI][circleci-badge]][circleci]

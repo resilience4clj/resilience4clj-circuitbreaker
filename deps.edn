@@ -1,8 +1,8 @@
 {:paths ["src"]
  
  :deps
- {org.clojure/clojure                                {:mvn/version "1.10.0"}
-  io.github.resilience4j/resilience4j-circuitbreaker {:mvn/version "0.13.2"}}
+ {org.clojure/clojure                                {:mvn/version "1.10.1"}
+  io.github.resilience4j/resilience4j-circuitbreaker {:mvn/version "0.17.0"}}
 
  :aliases
  {:dev
@@ -14,5 +14,5 @@
   :test
   {:extra-paths ["test"]
    :extra-deps
-   {lambdaisland/kaocha {:mvn/version "0.0-413"}}
+   {lambdaisland/kaocha {:mvn/version "0.0-529"}}
    :main-opts ["-m" "kaocha.runner"]}}}
